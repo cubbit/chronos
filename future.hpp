@@ -15,9 +15,7 @@ namespace cubbit
         future() = default;
         future(std::shared_ptr<shared_state<T>> state) : _state(std::move(state)){};
 
-        ~future()
-        {
-        }
+        ~future() = default;
 
         void wait()
         {
@@ -39,9 +37,7 @@ namespace cubbit
         future() = default;
         future(std::shared_ptr<shared_state<void>> state) : _state(std::move(state)){};
 
-        ~future()
-        {
-        }
+        ~future() = default;
 
         void wait()
         {

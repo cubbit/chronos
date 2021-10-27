@@ -12,9 +12,7 @@ namespace cubbit
         bool _obtained{false};
 
     public:
-        ~promise()
-        {
-        }
+        ~promise() = default;
 
         future<T> get_future()
         {
@@ -49,9 +47,7 @@ namespace cubbit
         bool _obtained{false};
 
     public:
-        ~promise()
-        {
-        }
+        ~promise() = default;
 
         future<void> get_future()
         {

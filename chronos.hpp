@@ -36,9 +36,7 @@ namespace cubbit
               _configuration(configuration)
         {
             for(auto& [category, limit] : this->_configuration)
-            {
                 this->_current_state[category] = 0;
-            }
 
             this->_scheduler.bind();
         }
