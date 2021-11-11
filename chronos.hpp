@@ -27,6 +27,7 @@ namespace cubbit
         cubbit::condition_variable _condition;
 
         std::map<int, std::atomic<unsigned int>> _current_state;
+        bool _shutdown{false};
 
         marl::WaitGroup _pending_tasks;
 
@@ -48,6 +49,18 @@ namespace cubbit
             defer(this->_scheduler.unbind());
         }
 
+        void shutdown()
+        {
+            cubbit::unique_lock<cubbit::mutex> lock(this->_mutex);
+            this->_shutdown = true;
+            this->_condition.notify_all();
+        }
+
+        void wait()
+        {
+            this->_pending_tasks.wait();
+        }
+
         bool can_schedule(int category)
         {
             if(this->_configuration.find(category) == this->_configuration.end())
@@ -56,7 +69,11 @@ namespace cubbit
             {
                 cubbit::unique_lock<cubbit::mutex> lock(this->_mutex);
                 this->_condition.wait(lock, [&]
-                                      { return this->_current_state[category] < this->_configuration[category]; });
+                                      { return this->_shutdown || this->_current_state[category] < this->_configuration[category]; });
+
+                if(this->_shutdown)
+                    throw std::system_error(make_error_code(std::errc::operation_canceled), "Cannot schedule task");
+
                 this->_current_state[category]++;
                 this->_pending_tasks.add();
             }
@@ -82,7 +99,7 @@ namespace cubbit
         schedule(Callable&& task, int category)
         {
             if(!this->can_schedule(category))
-                throw std::exception();
+                throw std::system_error(make_error_code(std::errc::invalid_argument));
 
             promise<typename std::result_of<Callable()>::type> promise;
             auto future = promise.get_future();
@@ -97,7 +114,7 @@ namespace cubbit
                                }
                                catch(std::exception& exception)
                                {
-                                   promise.set_exception(std::make_exception_ptr(exception));
+                                   promise.set_exception(make_exception_ptr(exception));
                                }
 
                                std::lock_guard lock(this->_mutex);
@@ -113,7 +130,7 @@ namespace cubbit
         schedule(Callable& task, int category)
         {
             if(!this->can_schedule(category))
-                throw std::exception();
+                throw std::system_error(make_error_code(std::errc::invalid_argument));
 
             promise<typename std::result_of<Callable()>::type> promise;
             auto future = promise.get_future();
@@ -128,7 +145,7 @@ namespace cubbit
                                }
                                catch(std::exception& exception)
                                {
-                                   promise.set_exception(std::make_exception_ptr(exception));
+                                   promise.set_exception(make_exception_ptr(exception));
                                }
 
                                std::lock_guard lock(this->_mutex);
