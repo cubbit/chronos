@@ -1,9 +1,11 @@
 #pragma once
 
+#include <iostream>
 #include <map>
 #include <marl/defer.h>
 #include <marl/scheduler.h>
 #include <marl/waitgroup.h>
+#include <queue>
 #include <string>
 #include <type_traits>
 
@@ -22,13 +24,13 @@ namespace cubbit
     {
         marl::Scheduler _scheduler;
         std::map<int, int> _configuration;
-
+        std::queue<std::function<void()>> _job_queue;
+        std::thread _jobs_thread;
+        cubbit::mutex _job_mutex;
         cubbit::mutex _mutex;
         cubbit::condition_variable _condition;
-
         std::map<int, std::atomic<unsigned int>> _current_state;
         bool _shutdown{false};
-
         marl::WaitGroup _pending_tasks;
 
     public:
@@ -40,13 +42,43 @@ namespace cubbit
                 this->_current_state[category] = 0;
 
             this->_scheduler.bind();
+
+            this->_jobs_thread = std::thread(
+                [&]
+                {
+                    this->_scheduler.bind();
+                    defer(this->_scheduler.unbind());
+
+                    while(true)
+                    {
+                        cubbit::unique_lock<cubbit::mutex> lock(this->_mutex);
+                        this->_condition.wait(lock, [&]
+                                              { return this->_shutdown || this->_job_queue.size() > 0; });
+
+                        if(this->_shutdown)
+                            return;
+
+                        std::lock_guard<cubbit::mutex> lock_guard(this->_job_mutex);
+
+                        auto& job = this->_job_queue.front();
+
+                        marl::schedule(std::move(job));
+
+                        this->_job_queue.pop();
+                    }
+                });
         }
 
         ~chronos()
         {
             this->_pending_tasks.wait();
 
-            defer(this->_scheduler.unbind());
+            this->_scheduler.unbind();
+
+            this->shutdown();
+
+            if(this->_jobs_thread.joinable())
+                this->_jobs_thread.join();
         }
 
         void shutdown()
@@ -104,23 +136,28 @@ namespace cubbit
             promise<typename std::result_of<Callable()>::type> promise;
             auto future = promise.get_future();
 
-            marl::schedule([&, category, task = std::move(std::forward<Callable>(task)), promise]() mutable
-                           {
-                               defer(this->_pending_tasks.done());
+            std::lock_guard<cubbit::mutex> lock(this->_mutex);
 
-                               try
-                               {
-                                   execute_task(task, promise);
-                               }
-                               catch(std::exception& exception)
-                               {
-                                   promise.set_exception(make_exception_ptr(exception));
-                               }
+            this->_job_queue.push(
+                std::move([&, category, task = std::move(std::forward<Callable>(task)), promise]() mutable
+                          {
+                              defer(this->_pending_tasks.done());
 
-                               std::lock_guard lock(this->_mutex);
-                               this->_current_state[category]--;
-                               this->_condition.notify_all();
-                           });
+                              try
+                              {
+                                  execute_task(task, promise);
+                              }
+                              catch(std::exception& exception)
+                              {
+                                  promise.set_exception(make_exception_ptr(exception));
+                              }
+
+                              std::lock_guard lock(this->_mutex);
+                              this->_current_state[category]--;
+                              this->_condition.notify_all();
+                          }));
+
+            this->_condition.notify_one();
 
             return future;
         }
@@ -135,23 +172,28 @@ namespace cubbit
             promise<typename std::result_of<Callable()>::type> promise;
             auto future = promise.get_future();
 
-            marl::schedule([&, category, promise]() mutable
-                           {
-                               defer(this->_pending_tasks.done());
+            std::lock_guard<cubbit::mutex> lock(this->_mutex);
 
-                               try
-                               {
-                                   execute_task(task, promise);
-                               }
-                               catch(std::exception& exception)
-                               {
-                                   promise.set_exception(make_exception_ptr(exception));
-                               }
+            this->_job_queue.push(
+                [&, category, promise]() mutable
+                {
+                    defer(this->_pending_tasks.done());
 
-                               std::lock_guard lock(this->_mutex);
-                               this->_current_state[category]--;
-                               this->_condition.notify_all();
-                           });
+                    try
+                    {
+                        execute_task(task, promise);
+                    }
+                    catch(std::exception& exception)
+                    {
+                        promise.set_exception(make_exception_ptr(exception));
+                    }
+
+                    std::lock_guard lock(this->_mutex);
+                    this->_current_state[category]--;
+                    this->_condition.notify_all();
+                });
+
+            this->_condition.notify_one();
 
             return future;
         }
