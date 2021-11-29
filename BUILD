@@ -1,6 +1,8 @@
 cc_library(
     name = "chronos",
-    srcs = [],
+    srcs = [
+        "chronos.cc",
+    ],
     hdrs = [
         "chronos.hpp",
         "condition_variable.hpp",

@@ -22,7 +22,7 @@ namespace cubbit
 
     class chronos
     {
-        marl::Scheduler _scheduler;
+        static marl::Scheduler _scheduler;
         std::map<int, int> _configuration;
         std::queue<std::function<void()>> _job_queue;
         std::thread _jobs_thread;
@@ -35,8 +35,7 @@ namespace cubbit
 
     public:
         chronos(std::map<int, int> configuration)
-            : _scheduler(marl::Scheduler::Config::allCores()),
-              _configuration(configuration)
+            : _configuration(configuration)
         {
             for(auto& [category, limit] : this->_configuration)
                 this->_current_state[category] = 0;
@@ -157,7 +156,7 @@ namespace cubbit
                               this->_condition.notify_all();
                           }));
 
-            this->_condition.notify_one();
+            this->_condition.notify_all();
 
             return future;
         }
@@ -193,7 +192,7 @@ namespace cubbit
                     this->_condition.notify_all();
                 });
 
-            this->_condition.notify_one();
+            this->_condition.notify_all();
 
             return future;
         }
