@@ -36,7 +36,7 @@ namespace cubbit
             this->_mark_done_and_notify();
         }
 
-        void wait()
+        void wait() const
         {
             this->_wg.wait();
         }

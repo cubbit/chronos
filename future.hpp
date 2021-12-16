@@ -17,7 +17,7 @@ namespace cubbit
 
         ~future() = default;
 
-        void wait()
+        void wait() const
         {
             this->_state->wait();
         }
@@ -39,7 +39,7 @@ namespace cubbit
 
         ~future() = default;
 
-        void wait()
+        void wait() const
         {
             this->_state->wait();
         }
