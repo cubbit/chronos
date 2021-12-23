@@ -14,35 +14,44 @@
 
 namespace cubbit
 {
-    template <int Category>
+    using category_type = int;
+    static constexpr category_type generic = std::numeric_limits<category_type>::max();
+
+    template <category_type Category>
     struct task
     {
-        int category() const { return Category; }
+        category_type category() const { return Category; }
     };
 
-    class chronos
+    //forward declaration
+    template <typename Callable>
+    future<typename std::result_of<Callable()>::type>
+    async(Callable&& callable, category_type category = generic);
+
+    class chronos : public std::enable_shared_from_this<chronos>
     {
+        static std::weak_ptr<chronos> _instance;
+
         std::unique_ptr<marl::Scheduler> _scheduler;
-        std::map<int, int> _configuration;
+        std::map<category_type, int> _configuration;
         std::queue<std::function<void()>> _job_queue;
         std::thread _jobs_thread;
         cubbit::mutex _job_mutex;
         cubbit::mutex _mutex;
         cubbit::condition_variable _condition;
-        std::map<int, std::atomic<unsigned int>> _current_state;
+        std::map<category_type, std::atomic<unsigned int>> _current_state;
+        bool _active{false};
         bool _shutdown{false};
         marl::WaitGroup _pending_tasks;
 
-    public:
-        chronos(std::map<int, int> configuration);
+        chronos(std::map<category_type, int> configuration);
 
+    public:
         ~chronos();
 
         void shutdown();
-
         void wait();
-
-        bool can_schedule(int category);
+        bool can_schedule(category_type category);
 
         template <typename Callable>
         void execute_task(Callable& task, promise<typename std::enable_if<!std::is_void<typename std::result_of<Callable()>::type>::value, typename std::result_of<Callable()>::type>::type>& _promise)
@@ -59,7 +68,7 @@ namespace cubbit
 
         template <typename Callable>
         future<typename std::result_of<Callable()>::type>
-        schedule(Callable&& task, int category)
+        schedule(Callable&& task, category_type category)
         {
             if(!this->can_schedule(category))
                 throw std::system_error(make_error_code(std::errc::invalid_argument));
@@ -95,7 +104,7 @@ namespace cubbit
 
         template <typename Callable>
         future<typename std::result_of<Callable()>::type>
-        schedule(Callable& task, int category)
+        schedule(Callable& task, category_type category)
         {
             if(!this->can_schedule(category))
                 throw std::system_error(make_error_code(std::errc::invalid_argument));
@@ -135,5 +144,50 @@ namespace cubbit
         {
             return this->schedule(std::forward<Task>(task), task.category());
         }
+
+        template <typename Callable>
+        friend future<typename std::result_of<Callable()>::type>
+        async(Callable&& callable, category_type category)
+        {
+            if(auto instance = chronos::_instance.lock(); instance)
+                return instance->schedule(std::forward<Callable>(callable), category);
+
+            throw std::runtime_error("Chronos is not initialized");
+        }
+
+        template <typename... Args>
+        static std::shared_ptr<chronos> create(Args&&... args)
+        {
+            return std::shared_ptr<chronos>(new chronos(std::forward<Args>(args)...));
+        }
+
     };
+
+    namespace this_fiber
+    {
+        template <typename Clock, typename Duration>
+        static inline void sleep_until(const std::chrono::time_point<Clock, Duration>& timeout)
+        {
+            cubbit::mutex mutex;
+            cubbit::condition_variable condition;
+
+            cubbit::unique_lock<cubbit::mutex> lock(mutex);
+
+            condition.wait_until(lock, timeout, []
+                                 { return false; });
+        }
+
+        template <typename Rep, typename Period>
+        static inline void sleep_for(const std::chrono::duration<Rep, Period>& duration)
+        {
+            const auto timeout = std::chrono::system_clock::now() + duration;
+            cubbit::mutex mutex;
+            cubbit::condition_variable condition;
+
+            cubbit::unique_lock<cubbit::mutex> lock(mutex);
+
+            condition.wait_until(lock, timeout, []
+                                 { return false; });
+        }
+    } // namespace this_fiber
 } // namespace cubbit

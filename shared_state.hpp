@@ -42,35 +42,69 @@ namespace cubbit
         }
     };
 
+    template <typename T, typename Enable = void>
+    class shared_state;
+
     template <typename T>
-    class shared_state : public shared_state_base
+    class shared_state<T, typename std::enable_if<std::is_default_constructible<T>::value>::type> : public shared_state_base
+    {
+        T _value;
+
+    public:
+        shared_state() = default;
+
+        template<typename R>
+        shared_state(R&& value): _value(std::forward<R>(value))
+        {
+            this->_mark_done_and_notify();
+        }
+
+        template<typename R>
+        void set_value(R&& value)
+        {
+            std::lock_guard<cubbit::mutex> lock(this->_mutex);
+
+            if(this->_done)
+                throw std::future_error(std::future_errc::promise_already_satisfied);
+
+            this->_value = std::forward<R>(value);
+            this->_mark_done_and_notify();
+        }
+
+        T& get()
+        {
+            this->_wg.wait();
+
+            if(this->_exception)
+                std::rethrow_exception(this->_exception);
+
+            return this->_value;
+        }
+    };
+
+    template <typename T>
+    class shared_state<T, typename std::enable_if<!std::is_default_constructible<T>::value>::type> : public shared_state_base
     {
         std::unique_ptr<T> _value;
 
     public:
-        ~shared_state()
+        shared_state() = default;
+
+        template<typename R>
+        shared_state(R&& value): _value(std::make_unique<T>(std::forward<R>(value)))
         {
-        }
-
-        void set_value(const T& value)
-        {
-            std::lock_guard<cubbit::mutex> lock(this->_mutex);
-
-            if(this->_done)
-                throw std::future_error(std::future_errc::promise_already_satisfied);
-
-            this->_value = std::make_unique<T>(value);
             this->_mark_done_and_notify();
         }
 
-        void set_value(T&& value)
+        template<typename R>
+        void set_value(R&& value)
         {
             std::lock_guard<cubbit::mutex> lock(this->_mutex);
 
             if(this->_done)
                 throw std::future_error(std::future_errc::promise_already_satisfied);
 
-            this->_value = std::make_unique<T>(std::move(value));
+            this->_value = std::make_unique<T>(std::forward<R>(value));
             this->_mark_done_and_notify();
         }
 

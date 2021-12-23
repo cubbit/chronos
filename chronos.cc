@@ -2,7 +2,9 @@
 
 namespace cubbit
 {
-    chronos::chronos(std::map<int, int> configuration)
+    std::weak_ptr<chronos> chronos::_instance{};
+
+    chronos::chronos(std::map<category_type, int> configuration)
         : _configuration(configuration)
     {
         for(auto& [category, limit] : this->_configuration)
@@ -11,40 +13,48 @@ namespace cubbit
         this->_jobs_thread = std::thread(
             [this]
             {
-                this->_scheduler = std::make_unique<marl::Scheduler>(marl::Scheduler::Config::allCores());
-                this->_scheduler->bind();
-                defer(this->_scheduler->unbind());
-
-                while(true)
                 {
-                    cubbit::unique_lock<cubbit::mutex> lock(this->_mutex);
-                    this->_condition.wait(lock, [&]
-                                          { return this->_shutdown || this->_job_queue.size() > 0; });
+                    auto scheduler = std::make_unique<marl::Scheduler>(marl::Scheduler::Config::allCores());
+                    scheduler->bind();
+                    defer(scheduler->unbind());
+                    this->_active = true;
+                    chronos::_instance = this->weak_from_this();
 
-                    if(this->_shutdown)
-                        break;
+                    while(true)
+                    {
+                        cubbit::unique_lock<cubbit::mutex> lock(this->_mutex);
+                        this->_condition.wait(lock, [&]
+                                              { return this->_shutdown || this->_job_queue.size() > 0; });
 
-                    std::lock_guard<cubbit::mutex> lock_guard(this->_job_mutex);
+                        if(this->_shutdown)
+                            break;
 
-                    auto& job = this->_job_queue.front();
+                        std::lock_guard<cubbit::mutex> lock_guard(this->_job_mutex);
 
-                    marl::schedule(std::move(job));
+                        auto& job = this->_job_queue.front();
 
-                    this->_job_queue.pop();
+                        marl::schedule(std::move(job));
+
+                        this->_job_queue.pop();
+                    }
                 }
+
+                this->_active = false;
+                this->_condition.notify_all();
             });
+
+        this->_jobs_thread.detach();
     }
 
     chronos::~chronos()
     {
-        this->_pending_tasks.wait();
-
         this->shutdown();
 
-        this->_scheduler = nullptr;
+        this->_pending_tasks.wait();
 
-        if(this->_jobs_thread.joinable())
-            this->_jobs_thread.join();
+        cubbit::unique_lock<cubbit::mutex> lock(this->_mutex);
+        this->_condition.wait(lock, [this]
+                              { return !this->_active; });
     }
 
     void chronos::shutdown()
@@ -59,8 +69,15 @@ namespace cubbit
         this->_pending_tasks.wait();
     }
 
-    bool chronos::can_schedule(int category)
+    bool chronos::can_schedule(category_type category)
     {
+        if(category == generic)
+        {
+            this->_pending_tasks.add();
+
+            return true;
+        }
+
         if(this->_configuration.find(category) == this->_configuration.end())
             return false;
 

@@ -15,6 +15,9 @@ namespace cubbit
         future() = default;
         future(std::shared_ptr<shared_state<T>> state) : _state(std::move(state)){};
 
+        future(const T& value) : _state(std::make_shared<shared_state<T>>(value)) {}
+        future(T&& value) : _state(std::make_shared<shared_state<T>>(std::move(value))) {}
+
         ~future() = default;
 
         void wait() const
