@@ -21,7 +21,7 @@ namespace cubbit
 
             this->_obtained = true;
 
-            return future{_state};
+            return future<T>{_state};
         }
 
         void set_value(const T& value)
@@ -56,7 +56,7 @@ namespace cubbit
 
             this->_obtained = true;
 
-            return future{_state};
+            return future<void>{_state};
         }
 
         void set_value()

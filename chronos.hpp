@@ -92,7 +92,7 @@ namespace cubbit
                         promise.set_exception(make_exception_ptr(exception));
                     }
 
-                    std::lock_guard lock(this->_mutex);
+                    std::lock_guard<cubbit::mutex> lock(this->_mutex);
                     this->_current_state[category]--;
                     this->_condition.notify_all();
                 });
@@ -128,7 +128,7 @@ namespace cubbit
                         promise.set_exception(make_exception_ptr(exception));
                     }
 
-                    std::lock_guard lock(this->_mutex);
+                    std::lock_guard<cubbit::mutex> lock(this->_mutex);
                     this->_current_state[category]--;
                     this->_condition.notify_all();
                 });
@@ -160,7 +160,6 @@ namespace cubbit
         {
             return std::shared_ptr<chronos>(new chronos(std::forward<Args>(args)...));
         }
-
     };
 
     namespace this_fiber
