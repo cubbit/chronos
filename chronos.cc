@@ -18,7 +18,6 @@ namespace cubbit
                     scheduler->bind();
                     defer(scheduler->unbind());
                     this->_active = true;
-                    chronos::_instance = this->weak_from_this();
 
                     while(true)
                     {
