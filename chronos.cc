@@ -68,9 +68,6 @@ namespace cubbit
     void chronos::wait()
     {
         this->_pending_tasks.wait();
-
-        if(this->_jobs_thread.joinable())
-            this->_jobs_thread.join();
     }
 
     bool chronos::can_schedule(category_type category)
