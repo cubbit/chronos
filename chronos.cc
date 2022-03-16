@@ -16,7 +16,6 @@ namespace cubbit
                 {
                     auto scheduler = std::make_unique<marl::Scheduler>(marl::Scheduler::Config::allCores());
                     scheduler->bind();
-                    defer(scheduler->unbind());
                     this->_active = true;
 
                     while(true)
@@ -36,13 +35,13 @@ namespace cubbit
 
                         this->_job_queue.pop();
                     }
+
+                    scheduler->unbind();
                 }
 
                 this->_active = false;
                 this->_condition.notify_all();
             });
-
-        this->_jobs_thread.detach();
     }
 
     chronos::~chronos()
@@ -54,6 +53,9 @@ namespace cubbit
         cubbit::unique_lock<cubbit::mutex> lock(this->_mutex);
         this->_condition.wait(lock, [this]
                               { return !this->_active; });
+
+        if(this->_jobs_thread.joinable())
+            this->_jobs_thread.join();
     }
 
     void chronos::shutdown()
@@ -66,6 +68,9 @@ namespace cubbit
     void chronos::wait()
     {
         this->_pending_tasks.wait();
+
+        if(this->_jobs_thread.joinable())
+            this->_jobs_thread.join();
     }
 
     bool chronos::can_schedule(category_type category)
