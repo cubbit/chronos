@@ -15,6 +15,7 @@ cc_library(
     deps = [
         "@marl",
     ],
+    linkstatic = True,
 )
 
 cc_binary(
