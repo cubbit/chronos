@@ -22,9 +22,9 @@ namespace cubbit
                     {
                         cubbit::unique_lock<cubbit::mutex> lock(this->_mutex);
                         this->_condition.wait(lock, [&]
-                                              { return this->_shutdown || this->_job_queue.size() > 0; });
+                                              { return this->_job_queue.size() > 0 || (this->_job_queue.empty() && this->_shutdown); });
 
-                        if(this->_shutdown)
+                        if(this->_shutdown && this->_job_queue.empty())
                             break;
 
                         std::lock_guard<cubbit::mutex> lock_guard(this->_job_mutex);
@@ -42,6 +42,10 @@ namespace cubbit
                 this->_active = false;
                 this->_condition.notify_all();
             });
+
+#ifdef _GNU_SOURCE
+        pthread_setname_np(this->_jobs_thread.native_handle(), "chronos_queue");
+#endif
     }
 
     chronos::~chronos()
