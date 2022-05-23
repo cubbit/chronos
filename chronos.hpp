@@ -159,7 +159,7 @@ namespace cubbit
         static std::shared_ptr<chronos> create(Args&&... args)
         {
             auto shared = std::shared_ptr<chronos>(new chronos(std::forward<Args>(args)...));
-            chronos::_instance = shared->weak_from_this();
+            chronos::_instance = shared->shared_from_this();
 
             return shared;
         }
