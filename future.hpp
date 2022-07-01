@@ -29,6 +29,11 @@ namespace cubbit
         {
             return this->_state->get();
         }
+
+        bool waitable() const
+        {
+            return bool(this->_state);
+        }
     };
 
     template <>
@@ -50,6 +55,11 @@ namespace cubbit
         void get()
         {
             this->_state->get();
+        }
+
+        bool waitable() const
+        {
+            return bool(this->_state);
         }
     };
 } // namespace cubbit
