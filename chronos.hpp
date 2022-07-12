@@ -179,6 +179,15 @@ namespace cubbit
                                  { return false; });
         }
 
+        template <typename Clock, typename Duration>
+        static inline void sleep_until(cubbit::unique_lock<cubbit::mutex>& lock, const std::chrono::time_point<Clock, Duration>& timeout)
+        {
+            cubbit::condition_variable condition;
+
+            condition.wait_until(lock, timeout, []
+                                 { return false; });
+        }
+
         template <typename Rep, typename Period>
         static inline void sleep_for(const std::chrono::duration<Rep, Period>& duration)
         {
