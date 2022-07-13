@@ -4,48 +4,18 @@ namespace cubbit
 {
     std::weak_ptr<chronos> chronos::_instance{};
 
+    chronos::chronos()
+    {
+        this->_start_jobs_thread();
+    }
+
     chronos::chronos(std::map<category_type, int> configuration)
         : _configuration(configuration)
     {
         for(auto& [category, limit] : this->_configuration)
             this->_current_state[category] = 0;
 
-        this->_jobs_thread = std::thread(
-            [this]
-            {
-                {
-                    auto scheduler = std::make_unique<marl::Scheduler>(marl::Scheduler::Config::allCores());
-                    scheduler->bind();
-                    this->_active = true;
-
-                    while(true)
-                    {
-                        cubbit::unique_lock<cubbit::mutex> lock(this->_mutex);
-                        this->_condition.wait(lock, [&]
-                                              { return this->_job_queue.size() > 0 || (this->_job_queue.empty() && this->_shutdown); });
-
-                        if(this->_shutdown && this->_job_queue.empty())
-                            break;
-
-                        std::lock_guard<cubbit::mutex> lock_guard(this->_job_mutex);
-
-                        auto& job = this->_job_queue.front();
-
-                        marl::schedule(std::move(job));
-
-                        this->_job_queue.pop();
-                    }
-
-                    scheduler->unbind();
-                }
-
-                this->_active = false;
-                this->_condition.notify_all();
-            });
-
-#ifdef _GNU_SOURCE
-        pthread_setname_np(this->_jobs_thread.native_handle(), "chronos_queue");
-#endif
+        this->_start_jobs_thread();
     }
 
     chronos::~chronos()
@@ -99,5 +69,45 @@ namespace cubbit
         }
 
         return true;
+    }
+
+    void chronos::_start_jobs_thread()
+    {
+        this->_jobs_thread = std::thread(
+            [this]
+            {
+                {
+                    auto scheduler = std::make_unique<marl::Scheduler>(marl::Scheduler::Config::allCores());
+                    scheduler->bind();
+                    this->_active = true;
+
+                    while(true)
+                    {
+                        cubbit::unique_lock<cubbit::mutex> lock(this->_mutex);
+                        this->_condition.wait(lock, [&]
+                                              { return this->_job_queue.size() > 0 || (this->_job_queue.empty() && this->_shutdown); });
+
+                        if(this->_shutdown && this->_job_queue.empty())
+                            break;
+
+                        std::lock_guard<cubbit::mutex> lock_guard(this->_job_mutex);
+
+                        auto& job = this->_job_queue.front();
+
+                        marl::schedule(std::move(job));
+
+                        this->_job_queue.pop();
+                    }
+
+                    scheduler->unbind();
+                }
+
+                this->_active = false;
+                this->_condition.notify_all();
+            });
+
+#ifdef _GNU_SOURCE
+        pthread_setname_np(this->_jobs_thread.native_handle(), "chronos_queue");
+#endif
     }
 } // namespace cubbit

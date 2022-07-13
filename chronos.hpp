@@ -44,6 +44,7 @@ namespace cubbit
         bool _shutdown{false};
         marl::WaitGroup _pending_tasks;
 
+        chronos();
         chronos(std::map<category_type, int> configuration);
 
     public:
@@ -163,6 +164,9 @@ namespace cubbit
 
             return shared;
         }
+
+    private:
+        void _start_jobs_thread();
     };
 
     namespace this_fiber
