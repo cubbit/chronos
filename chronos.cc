@@ -24,9 +24,11 @@ namespace cubbit
 
         this->_pending_tasks.wait();
 
-        cubbit::unique_lock<cubbit::mutex> lock(this->_mutex);
-        this->_condition.wait(lock, [this]
-                              { return !this->_active; });
+        {
+            cubbit::unique_lock<cubbit::mutex> lock(this->_mutex);
+            this->_condition.wait(lock, [this]
+                                  { return !this->_active; });
+        }
 
         if(this->_jobs_thread.joinable())
             this->_jobs_thread.join();
