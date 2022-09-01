@@ -7,7 +7,7 @@ namespace cubbit
     using mutex = marl::mutex;
 
     using condition_variable = marl::ConditionVariable;
-    template <class T>
 
+    template <class T>
     using unique_lock = marl::lock;
 } // namespace cubbit
