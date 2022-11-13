@@ -1,8 +1,13 @@
-# Chronos scheduler
+---
+id: cpp-chronos
+title: Chronos scheduler
+sidebar_label: Chronos
+slug: /sdk/cpp/chronos
+---
 
 Chronos is a task/fiber scheduler based on [marl](https://github.com/google/marl).
 
-## Syncronization
+## Synchronization
 
 Chronos uses `mutex`, `lock` and `conditionVariable` from marl.
 They are aliased for convenience in `cubbit` namespace.
@@ -15,6 +20,7 @@ If you use a `cubbit` primitive in a thread that is not within the scheduler
 thread pool, the library will fall back to the normal `std` primitive.
 
 Example
+
 ```c++
 #include <chronos/condition_variable.hpp>
 
@@ -50,7 +56,6 @@ They use chronos synchronization primitives, so if you wait for a future within
 a fiber, the underlying OS thread will switch to another fiber.
 
 To use `cubbit::promise` and `cubbit::future` you need `#include <chronos/promise.hpp>`
-
 
 ## Utilities
 
@@ -93,7 +98,8 @@ The `schedule()` function returns a future, which is resolved when the scheduled
 fiber ends.
 
 Example:
-```c++
+
+```cpp
 enum category
 {
     cat1,
@@ -129,6 +135,7 @@ Users can extend the `cubbit::task` struct to create a callable object with an
 embedded category
 
 Example:
+
 ```c++
 enum category
 {
@@ -179,7 +186,7 @@ dedicated special thread of the thread pool.
 This is needed because marl does not allow to schedule fibers from outside the
 thread pool.
 
-
 ## Best practices
+
 - Always use `chronos` primitives (`cubbit::mutex`, `cubbit::condition_variable`,
 ecc...) inside fibers, because `std` primitives will block the thread pool
