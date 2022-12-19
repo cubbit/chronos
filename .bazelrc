@@ -1,0 +1,59 @@
+# Cubbit Bazel configuration file.
+# The full list of Bazel options: https://docs.bazel.build/versions/master/command-line-reference.html
+
+build --spawn_strategy=local
+build --cxxopt='-std=c++17'
+
+build --host_crosstool_top=@bazel_tools//tools/cpp:toolchain
+
+build --action_env=DOCKER_HOST --action_env=DOCKER_CERT_PATH --action_env=DOCKER_TLS_VERIFY
+run   --action_env=DOCKER_HOST --action_env=DOCKER_CERT_PATH --action_env=DOCKER_TLS_VERIFY
+
+###############################
+# Filesystem interactions     #
+###############################
+
+build --disk_cache=~/.bazel/cache
+build --repository_cache=~/.bazel/repo_cache
+build --action_env=DOCKER_REPO_CACHE=~/.bazel/docker_cache
+
+build --symlink_prefix=dist/
+
+build --nolegacy_external_runfiles
+run   --nolegacy_external_runfiles
+test  --nolegacy_external_runfiles
+
+build --incompatible_strict_action_env
+run   --incompatible_strict_action_env
+test  --incompatible_strict_action_env
+
+build --enable_runfiles
+run   --enable_runfiles
+test  --enable_runfiles
+
+###############################
+# Output                      #
+###############################
+
+build --verbose_failures
+query --output=label_kind
+test  --test_output=errors
+
+###############################
+# Test config                 #
+###############################
+
+build:unit --build_tag_filters=unit
+test:unit  --test_tag_filters=unit
+
+build:integration --build_tag_filters=integration
+test:integration  --test_tag_filters=integration
+
+build:e2e --build_tag_filters=e2e
+test:e2e  --test_tag_filters=e2e --cache_test_results=no
+
+###############################
+# User bazel configuration    #
+###############################
+
+try-import .bazelrc.user

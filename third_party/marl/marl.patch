@@ -1,0 +1,13 @@
+diff --git a/BUILD.bazel b/BUILD.bazel
+index 3d95fe9..de5175b 100644
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -35,7 +35,7 @@ cc_library(
+         "include",
+     ],
+     linkopts = select({
+-        "@bazel_tools//src/conditions:linux_x86_64": ["-pthread"],
++        "@bazel_tools//src/conditions:linux_x86_64": ["-lpthread"],
+         "//conditions:default": [],
+     }),
+     visibility = [
