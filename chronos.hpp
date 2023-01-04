@@ -39,7 +39,7 @@ namespace cubbit
         cubbit::mutex _job_mutex;
         cubbit::mutex _mutex;
         cubbit::condition_variable _condition;
-        std::map<category_type, std::atomic<unsigned int>> _current_state;
+        std::map<category_type, std::atomic<int>> _current_state;
         bool _active{false};
         bool _shutdown{false};
         marl::WaitGroup _pending_tasks;
